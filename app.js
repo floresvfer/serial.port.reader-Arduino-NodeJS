@@ -1,41 +1,37 @@
-var createError = require('http-errors');
-var express = require('express');
-var path = require('path');
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
+const SerialPort = require('serialport');
+const ReadLine = require('@serialport/parser-readline');
 
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
+const port = new SerialPort('COM6', {baudRate: 9600});
+const parser = port.pipe(new ReadLine({delimiter: '\n'}));
 
-var app = express();
 
-// view engine setup
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'pug');
+//mongodb+srv://user:<password>@cluster0.cakir.mongodb.net/myFirstDatabase?retryWrites=true&w=majority
 
-app.use(logger('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
+const MongoClient = require('mongodb').MongoClient;
+const uri = "";
 
-app.use('/', indexRouter);
-app.use('/users', usersRouter);
 
-// catch 404 and forward to error handler
-app.use(function(req, res, next) {
-  next(createError(404));
+
+port.on("open", () => {
+    console.log('Se abrió la comunicación');
 });
 
-// error handler
-app.use(function(err, req, res, next) {
-  // set locals, only providing error in development
-  res.locals.message = err.message;
-  res.locals.error = req.app.get('env') === 'development' ? err : {};
 
-  // render the error page
-  res.status(err.status || 500);
-  res.render('error');
+
+parser.on("data", data => {
+    console.log(data);
+    insertData(data);
 });
 
-module.exports = app;
+
+function insertData(data) {
+    MongoClient.connect(uri, (err, db) => {
+        if(err) throw err;
+        const dbo = db.db('mydb');
+        const obj = JSON.parse(data);
+        dbo.collection('medidas').insertOne(obj, (err, res) => {
+            if(err) throw err;
+            db.close();
+        });
+    });
+}
